@@ -90,7 +90,6 @@ function setup() {
 }
 
 function resetGame() {
-
   for(x = 0; x < GRID_WIDTH; x++) {
     grid[x] = [];
     for (y = 0; y < GRID_HEIGHT; y++) {
@@ -108,221 +107,229 @@ function resetGame() {
   timeToDrop = dropTime();
   score = 0;
   generateTetrimino();
+}
 
+function fall() {
+  // decrease timer for when falling tetrimino next moves down a cell
+  if (softDrop) {
+    timeToDrop -= 20;
+  } else {
+    timeToDrop--;
+  }
+  // if timer hits 0 move tetrimino down one
+  while (timeToDrop <= 0) {
+    timeToDrop += dropTime();
+    moveDown();
+  }
+  
+  checkForHold();
 
- }
+  if (clashDetect(currentTetrimino, tetriminoX, tetriminoY+1, tetriminoRot))  {
+    switchState(STATE_LOCK_ON);
+  }
+}
 
-function draw() {
+function stateLock() {
+  timeToDrop--;
+  checkForHold();
 
-  // run the game logic
-  switch (state) {
-    case STATE_FALLING: // the tetrimino is dropping
+  if (timeToDrop <= 0) {
+    // check for T-spin:
+    let tSpin = false;
+    if (currentTetrimino == 2 && lastMoveRotation) {
+      if (clashDetect(currentTetrimino, tetriminoX, tetriminoY-1, tetriminoRot) &&
+          clashDetect(currentTetrimino, tetriminoX-1, tetriminoY, tetriminoRot) &&
+          clashDetect(currentTetrimino, tetriminoX+1, tetriminoY, tetriminoRot)) {
+              tSpin = true;
+          }
+    }
 
-      // decrease timer for when falling tetrimino next moves down a cell
-      if (softDrop) {
-        timeToDrop -= 20;
+    // paint tetrimino onto the grid
+    let tetriminoSize = TETRIMINO[currentTetrimino].size;
+    let i = 0;
+
+    let lockedOnBelowSkyline = false;
+
+    for (y = 0; y < tetriminoSize; y++) {
+      for (x = 0; x < tetriminoSize; x++) {
+        if (TETRIMINO[currentTetrimino].rotation[tetriminoRot].shape[i] == 1) {
+          grid[x+tetriminoX][(y)+tetriminoY] = currentTetrimino;
+          if (y+tetriminoY > 19) lockedOnBelowSkyline = true;
+        }
+        i++;
+      }
+    }
+
+    if (lockedOnBelowSkyline) {
+      // generate an array containing the y co-ordinate of every
+      // completed row
+      linesComplete = [];
+      for (y = GRID_HEIGHT - 1; y >= 0; y--) {
+        let lineComplete = true;
+        for (x = 0; x < GRID_WIDTH; x++) {
+          if (grid[x][y] == -1) {
+            lineComplete = false;
+            break;
+          }
+        }
+        if (lineComplete) linesComplete.push(y);
+      }
+
+      if (linesComplete.length > 0) {
+        // increase player's score
+        lines+=linesComplete.length;
+
+        switch(linesComplete.length) {
+          case 1:
+           if (tSpin) {
+             message = 'T-SPIN\NSINGLE!';
+             score += 800 * level;
+           } else {
+             message = '';
+             score += 100 * level;
+           }
+           break;
+          case 2:
+           if (tSpin) {
+             message = 'T-SPIN\NDOUBLE!';
+             score += 1200 * level;
+           } else {
+             message = 'DOUBLE!';
+             score += 300 * level;
+           }
+           break
+          case 3:
+           if (tSpin) {
+             message = 'T-SPIN\NTRIPLE!';
+             score += 1600 * level;
+           } else {
+             message = 'TRIPLE!';
+             score += 500 * level;
+           }
+           break;
+          case 4:
+           message = 'TETRIS!';
+           score += 800 * level;
+           break;
+
+         }
+
+        messageTTL = FRAME_RATE;
+        // rect((tetriminoX+x)*CELLSIZE+BOARD_X,(tetriminoY+(y)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y,CELLSIZE-1,CELLSIZE-1);
+        messageX = (tetriminoX+(TETRIMINO[currentTetrimino].size/2))*CELLSIZE+BOARD_X;
+        messageY = (tetriminoY+(TETRIMINO[currentTetrimino].size/2)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y
+        // if at least one completed row, play the row clear animation
+        switchState(STATE_LINE_CLEAR_ANIMATION);
       } else {
-        timeToDrop--;
-      }
-      
-
-      // if timer hits 0 move tetrimino down one
-      while (timeToDrop <= 0) {
-        timeToDrop += dropTime();
-        moveDown();
-      }
-      
-      checkForHold();
-
-      if (clashDetect(currentTetrimino, tetriminoX, tetriminoY+1, tetriminoRot)) {
-        switchState(STATE_LOCK_ON);
-      }
-
-      break;
-
-    case STATE_LOCK_ON: // the tetrimino has touched down but not yet locked in place
-      timeToDrop--;
-      checkForHold();
-
-      if (timeToDrop <= 0) {
-
-          // check for T-spin:
-
-        let tSpin = false;
-        if (currentTetrimino == 2 && lastMoveRotation) {
-
-          if (clashDetect(currentTetrimino, tetriminoX, tetriminoY-1, tetriminoRot) &&
-              clashDetect(currentTetrimino, tetriminoX-1, tetriminoY, tetriminoRot) &&
-              clashDetect(currentTetrimino, tetriminoX+1, tetriminoY, tetriminoRot)) {
-                  tSpin = true;
-              }
-
+        if (tSpin) {
+          message = 'T-SPIN!';
+          messageTTL = FRAME_RATE;
+          // rect((tetriminoX+x)*CELLSIZE+BOARD_X,(tetriminoY+(y)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y,CELLSIZE-1,CELLSIZE-1);
+          messageX = (tetriminoX+(TETRIMINO[currentTetrimino].size/2))*CELLSIZE+BOARD_X;
+          messageY = (tetriminoY+(TETRIMINO[currentTetrimino].size/2)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y
+          score += 400 * level;
         }
-
-        // paint tetrimino onto the grid
-        let tetriminoSize = TETRIMINO[currentTetrimino].size;
-        let i = 0;
-
-        let lockedOnBelowSkyline = false;
-
-        for (y = 0; y < tetriminoSize; y++) {
-          for (x = 0; x < tetriminoSize; x++) {
-            if (TETRIMINO[currentTetrimino].rotation[tetriminoRot].shape[i] == 1) {
-              grid[x+tetriminoX][(y)+tetriminoY] = currentTetrimino;
-              if (y+tetriminoY > 19) lockedOnBelowSkyline = true;
-            }
-            i++;
-          }
-        }
-
-        if (lockedOnBelowSkyline) {
-          // generate an array containing the y co-ordinate of every
-          // completed row
-          linesComplete = [];
-          for (y = GRID_HEIGHT - 1; y >= 0; y--) {
-            let lineComplete = true;
-            for (x = 0; x < GRID_WIDTH; x++) {
-              if (grid[x][y] == -1) {
-                lineComplete = false;
-                break;
-              }
-            }
-            if (lineComplete) linesComplete.push(y);
-          }
-
-          if (linesComplete.length > 0) {
-            // increase player's score
-            lines+=linesComplete.length;
-
-            switch(linesComplete.length) {
-              case 1:
-               if (tSpin) {
-                 message = 'T-SPIN\NSINGLE!';
-                 score += 800 * level;
-               } else {
-                 message = '';
-                 score += 100 * level;
-               }
-               break;
-              case 2:
-               if (tSpin) {
-                 message = 'T-SPIN\NDOUBLE!';
-                 score += 1200 * level;
-               } else {
-                 message = 'DOUBLE!';
-                 score += 300 * level;
-               }
-               break
-              case 3:
-               if (tSpin) {
-                 message = 'T-SPIN\NTRIPLE!';
-                 score += 1600 * level;
-               } else {
-                 message = 'TRIPLE!';
-                 score += 500 * level;
-               }
-               break;
-              case 4:
-               message = 'TETRIS!';
-               score += 800 * level;
-               break;
-
-             }
-
-            messageTTL = FRAME_RATE;
-            // rect((tetriminoX+x)*CELLSIZE+BOARD_X,(tetriminoY+(y)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y,CELLSIZE-1,CELLSIZE-1);
-            messageX = (tetriminoX+(TETRIMINO[currentTetrimino].size/2))*CELLSIZE+BOARD_X;
-            messageY = (tetriminoY+(TETRIMINO[currentTetrimino].size/2)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y
-            // if at least one completed row, play the row clear animation
-            switchState(STATE_LINE_CLEAR_ANIMATION);
-          } else {
-            if (tSpin) {
-              message = 'T-SPIN!';
-              messageTTL = FRAME_RATE;
-              // rect((tetriminoX+x)*CELLSIZE+BOARD_X,(tetriminoY+(y)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y,CELLSIZE-1,CELLSIZE-1);
-              messageX = (tetriminoX+(TETRIMINO[currentTetrimino].size/2))*CELLSIZE+BOARD_X;
-              messageY = (tetriminoY+(TETRIMINO[currentTetrimino].size/2)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y
-              score += 400 * level;
-            }
-            // otherwise try to drop another tetrimino
-            if (generateTetrimino()) {
-              timeToDrop = 1;
-              switchState(STATE_FALLING);
-            } else {
-              // if it failed, game over!
-              switchState(STATE_GAME_OVER_ANIMATION);
-            }
-          }
+        // otherwise try to drop another tetrimino
+        if (generateTetrimino()) {
+          timeToDrop = 1;
+          switchState(STATE_FALLING);
         } else {
-          // if tetrimino locked on entirely above the skyline - game over!
+          // if it failed, game over!
           switchState(STATE_GAME_OVER_ANIMATION);
         }
-      } else if (!clashDetect(currentTetrimino, tetriminoX, tetriminoY+1, tetriminoRot)) {
-          // the player has moved to a position the tetrimino can drop further from,
-          // so end lock on mode and continue dropping.
-          timeToDrop = dropTime();
-          switchState(STATE_FALLING);
       }
+    } else {
+      // if tetrimino locked on entirely above the skyline - game over!
+      switchState(STATE_GAME_OVER_ANIMATION);
+    }
+  } else if (!clashDetect(currentTetrimino, tetriminoX, tetriminoY+1, tetriminoRot)) {
+      // the player has moved to a position the tetrimino can drop further from,
+      // so end lock on mode and continue dropping.
+      timeToDrop = dropTime();
+      switchState(STATE_FALLING);
+  }
+}
 
+function clearLines() {
+  timeToDrop--;
+  if (timeToDrop <= 0) {
+    if (animationFrame == 10) {
+        removeClearedLines();
+        generateTetrimino();
+        switchState(STATE_FALLING);
+    } else {
+      linesComplete.forEach(function (y) {
+        if (animationFrame % 2 == 0) {
+          grid[4 - animationFrame / 2][y] = -1;
+          grid[5 + animationFrame / 2][y] = -1;
+        }
+      });
+      animationFrame++;
+      timeToDrop += ANIMATION_SPEED;
+    }
+  }
+}
+
+function gameOver() {
+  timeToDrop--;
+  if (timeToDrop <= 0) {
+
+    if (animationFrame <= 20) {
+      // First 20 frames: fill grid with blocks
+      for(x = 0; x < 10; x++) {
+        grid[x][39-animationFrame] = 7;
+      }
+    } else if (animationFrame <= 40) {
+      // Last 20 frames: empty grid of blocks
+      for (x = 0; x < 10; x++) {
+        grid[x][60-animationFrame] = -1;
+      }
+    } else {
+
+      switchState(STATE_GAME_OVER_PLAY_AGAIN);
+
+    }
+    timeToDrop += FRAME_RATE / 20;
+    animationFrame++;
+  }
+}
+
+function playAgain() {
+  timeToDrop--;
+  if (timeToDrop <= 0) {
+    // flash the "PLAY AGAIN"
+    if (animationFrame == 1) {
+      timeToDrop = FRAME_RATE;
+      animationFrame = 0;
+    } else {
+      timeToDrop = FRAME_RATE * 25 / 60;
+      animationFrame = 1;
+    }
+  }
+}
+
+function draw() {
+  // run the game logic
+  switch (state) {
+    // the tetrimino is dropping
+    case STATE_FALLING: 
+      fall();
       break;
-
+    // the tetrimino has touched down but not yet locked in place
+    case STATE_LOCK_ON: 
+      stateLock();
+      break;
+    // clear lines
     case STATE_LINE_CLEAR_ANIMATION:
-
-      timeToDrop--;
-      if (timeToDrop <= 0) {
-        if (animationFrame == 10) {
-            removeClearedLines();
-            generateTetrimino();
-            switchState(STATE_FALLING);
-        } else {
-          linesComplete.forEach(function (y) {
-            if (animationFrame % 2 == 0) {
-              grid[4 - animationFrame / 2][y] = -1;
-              grid[5 + animationFrame / 2][y] = -1;
-            }
-          });
-          animationFrame++;
-          timeToDrop += ANIMATION_SPEED;
-        }
-      }
+      clearLines();
       break;
-
+    // game over animation
     case STATE_GAME_OVER_ANIMATION:
-      timeToDrop--;
-      if (timeToDrop <= 0) {
-
-        if (animationFrame <= 20) {
-          // First 20 frames: fill grid with blocks
-          for(x = 0; x < 10; x++) {
-            grid[x][39-animationFrame] = 7;
-          }
-        } else if (animationFrame <= 40) {
-          // Last 20 frames: empty grid of blocks
-          for (x = 0; x < 10; x++) {
-            grid[x][60-animationFrame] = -1;
-          }
-        } else {
-
-          switchState(STATE_GAME_OVER_PLAY_AGAIN);
-
-        }
-        timeToDrop += FRAME_RATE / 20;
-        animationFrame++;
-      }
+      gameOver();
       break;
-
+    // prompt to play again
     case STATE_GAME_OVER_PLAY_AGAIN:
-      timeToDrop--;
-      if (timeToDrop <= 0) {
-        // flash the "PLAY AGAIN"
-        if (animationFrame == 1) {
-          timeToDrop = FRAME_RATE;
-          animationFrame = 0;
-        } else {
-          timeToDrop = FRAME_RATE * 25 / 60;
-          animationFrame = 1;
-        }
-      }
+      playAgain();
       break;
 
   }
@@ -389,7 +396,6 @@ function draw() {
         }
         i++;
       }
-
     }
   }
 
@@ -455,8 +461,6 @@ function draw() {
     textAlign(CENTER, CENTER);
     text(message, messageX, messageY);
   }
-
-
 }
 
 // Number of frames between each downward movement of the tetrimino
@@ -719,9 +723,3 @@ function windowResized() {
 document.ontouchmove = function(event) {
     event.preventDefault();
 };
-
-function start(){
-  while (true){
-    checkForHold();
-  }
-}
