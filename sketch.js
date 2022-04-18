@@ -3,9 +3,10 @@
 //
 // Credits:
 // Font: Copyright (c) 2011, Cody "CodeMan38" Boisclair (cody@zone38.net), with Reserved Font Name "Press Start".
-//
+// modifed by michael sexton
 
-const FRAME_RATE = 20;
+// how many diffrent frames the game shows per second
+const FRAME_RATE = 15;
 
 const PANEL_WIDTH = 200;
 const PANEL_HEIGHT = 300;
@@ -32,6 +33,10 @@ let grid = [];
 // Array containing the math symbols on the tetrominos
 let mathGrid = [];
 
+let sound1;
+let sound2;
+let sound3;
+let sound4;
 // variables for the state of the current falling tetrimino
 let tetriminoX;
 let tetriminoY;
@@ -83,8 +88,14 @@ const STATE_GAME_OVER_PLAY_AGAIN = 5;
 
 function preload() {
     myFont = loadFont('fonts/press-start-2p/PressStart2P.ttf');
+    soundFormats('mp3', 'ogg');
+    sound1 = loadSound('sounds/vine-boom/vine-boom.mp3');
+    sound2 = loadSound('sounds/water-phone/water-phone.mp3');
+    sound3 = loadSound('sounds/lego/lego.mp3');
+    sound4 = loadSound('sounds/oh-my-god/oh-my-god.mp3');
 }
 
+// sets the game up for play
 function setup() {
     frameRate(FRAME_RATE);
     scaleFactor = min(windowHeight / PANEL_HEIGHT, windowWidth / PANEL_WIDTH) * 1.0;
@@ -93,6 +104,7 @@ function setup() {
     resetGame();
 }
 
+// restarts the game for a new round
 function resetGame() {
     for (x = 0; x < GRID_WIDTH; x++) {
         grid[x] = [];
@@ -128,7 +140,11 @@ function fall() {
         moveDown();
     }
 
+    // checks to see if a player is holding left or right
     checkForHold();
+
+    checkLevel();
+
 
     if (clashDetect(currentTetrimino, tetriminoX, tetriminoY + 1, tetriminoRot)) {
         switchState(STATE_LOCK_ON);
@@ -154,15 +170,15 @@ function stateLock() {
         // paint tetrimino onto the grid
         let tetriminoSize = TETRIMINO[currentTetrimino].size;
         let i = 0;
-
+        // checks if tetromino is past the top of the screen
         let lockedOnBelowSkyline = false;
 
+        let mathIdx = 0;
         for (y = 0; y < tetriminoSize; y++) {
             for (x = 0; x < tetriminoSize; x++) {
                 if (TETRIMINO[currentTetrimino].rotation[tetriminoRot].shape[i] == 1) {
-                    // update the mathgrid here
                     grid[x + tetriminoX][y + tetriminoY] = currentTetrimino;
-                    mathGrid[x + tetriminoX][y + tetriminoY] = random(MATH_SYMBOLS);
+                    mathGrid[x + tetriminoX][y + tetriminoY] = nextSymbols[mathIdx++];
                     if (y + tetriminoY > 19) lockedOnBelowSkyline = true;
                 }
                 i++;
@@ -220,11 +236,12 @@ function stateLock() {
                         message = 'TETRIS!';
                         score += 800 * level;
                         break;
+                        sound4.play();
+                        sound3.stop();
 
                 }
 
                 messageTTL = FRAME_RATE;
-                // rect((tetriminoX+x)*CELLSIZE+BOARD_X,(tetriminoY+(y)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y,CELLSIZE-1,CELLSIZE-1);
                 messageX = (tetriminoX + (TETRIMINO[currentTetrimino].size / 2)) * CELLSIZE + BOARD_X;
                 messageY = (tetriminoY + (TETRIMINO[currentTetrimino].size / 2) - INVISIBLE_GRID_HEIGHT) * CELLSIZE + BOARD_Y
                 // if at least one completed row, play the row clear animation
@@ -233,7 +250,6 @@ function stateLock() {
                 if (tSpin) {
                     message = 'T-SPIN!';
                     messageTTL = FRAME_RATE;
-                    // rect((tetriminoX+x)*CELLSIZE+BOARD_X,(tetriminoY+(y)-INVISIBLE_GRID_HEIGHT)*CELLSIZE+BOARD_Y,CELLSIZE-1,CELLSIZE-1);
                     messageX = (tetriminoX + (TETRIMINO[currentTetrimino].size / 2)) * CELLSIZE + BOARD_X;
                     messageY = (tetriminoY + (TETRIMINO[currentTetrimino].size / 2) - INVISIBLE_GRID_HEIGHT) * CELLSIZE + BOARD_Y
                     score += 400 * level;
@@ -259,6 +275,7 @@ function stateLock() {
     }
 }
 
+// removes lines players clear, and moves the above line down one
 function clearLines() {
     timeToDrop--;
     if (timeToDrop <= 0) {
@@ -277,8 +294,10 @@ function clearLines() {
             timeToDrop += ANIMATION_SPEED;
         }
     }
+    sound3.play();
 }
 
+// runs when a player trys to place a tetromino fully abobe the skyline
 function gameOver() {
     timeToDrop--;
     if (timeToDrop <= 0) {
@@ -294,12 +313,11 @@ function gameOver() {
                 grid[x][60 - animationFrame] = -1;
             }
         } else {
-
             switchState(STATE_GAME_OVER_PLAY_AGAIN);
-
         }
         timeToDrop += FRAME_RATE / 20;
         animationFrame++;
+        sound2.play();
     }
 }
 
@@ -317,6 +335,7 @@ function playAgain() {
     }
 }
 
+// draws the grid the game in played on
 function drawGrid() {
     for (x = 0; x < GRID_WIDTH; x++) { 
         for (y = 0; y < VISIBLE_GRID_HEIGHT; y++) {
@@ -333,6 +352,7 @@ function drawGrid() {
     }
 }
 
+//show the next tetromino coming up
 function drawNextTetromino() {
     text('NEXT', 6, BOARD_Y + 8);
     noStroke();
@@ -370,6 +390,7 @@ function drawNextTetromino() {
     }
 }
 
+// show the falling tetromino
 function drawFallingTetromino() {
     let ghostOffset = 0;
     while (!clashDetect(currentTetrimino, tetriminoX, tetriminoY + ghostOffset + 1, tetriminoRot)) {
@@ -379,17 +400,23 @@ function drawFallingTetromino() {
     let currentTetriminoColor = color(TETRIMINO[currentTetrimino].color[0], TETRIMINO[currentTetrimino].color[1], TETRIMINO[currentTetrimino].color[2]);
     if (state == STATE_FALLING || state == STATE_LOCK_ON) {
         let i = 0;
+        let mathIdx = 0;
         for (y = 0; y < tetriminoSize; y++) {
             for (x = 0; x < tetriminoSize; x++) {
                 if (TETRIMINO[currentTetrimino].rotation[tetriminoRot].shape[i] == 1) {
                     if (tetriminoY + (y) >= VISIBLE_GRID_HEIGHT) { // don't draw any parts above the skyline
                         noStroke();
                         fill(currentTetriminoColor);
-                        rect((tetriminoX + x) * CELLSIZE + BOARD_X, (tetriminoY + (y) - INVISIBLE_GRID_HEIGHT) * CELLSIZE + BOARD_Y, CELLSIZE - 1, CELLSIZE - 1);
+                        rect(
+                            (tetriminoX + x) * CELLSIZE + BOARD_X,
+                            (tetriminoY + (y) - INVISIBLE_GRID_HEIGHT) * CELLSIZE + BOARD_Y,
+                            CELLSIZE - 1,
+                            CELLSIZE - 1
+                        );
                         fill(0, 0, 0);
                         textSize(8);
                         textAlign(LEFT, BOTTOM);
-                        var val = mathGrid[(tetriminoX + x)][(tetriminoY + y - INVISIBLE_GRID_HEIGHT)];
+                        var val = nextSymbols[mathIdx++];
                         text(val, (tetriminoX + x) * CELLSIZE + BOARD_X, (tetriminoY + y - INVISIBLE_GRID_HEIGHT + 1) * CELLSIZE + BOARD_Y);
                     }
 
@@ -406,6 +433,7 @@ function drawFallingTetromino() {
     }
 }
 
+//show the game board
 function drawGameBoard() {
     // border colour
     background(75, 75, 75);
@@ -437,6 +465,7 @@ function drawGameBoard() {
     text(score, GRID_WIDTH * CELLSIZE + 4 + BOARD_X, BOARD_Y + 66);
 }
 
+//a bunch of checks constintly running
 function draw() {
     // run the game logic
     switch (state) {
@@ -460,7 +489,6 @@ function draw() {
         case STATE_GAME_OVER_PLAY_AGAIN:
             playAgain();
             break;
-
     }
 
     drawGameBoard();
@@ -502,6 +530,7 @@ function dropTime() {
     return FRAME_RATE * pow((0.8 - ((level - 1) * 0.007)), (level - 1));
 }
 
+// moves the tetromino down 1 on the grid
 function moveDown() {
     if (!clashDetect(currentTetrimino, tetriminoX, tetriminoY + 1, tetriminoRot)) {
         tetriminoY++;
@@ -516,6 +545,7 @@ function moveDown() {
     }
 }
 
+// change the state the game is in
 function switchState(newState) {
 
     switch (newState) {
@@ -568,6 +598,7 @@ function sack_pop() {
     return sack.pop();
 }
 
+// show the tetrominos that have landed
 function generateTetrimino() {
 
     tetriminoX = 3;
@@ -626,30 +657,38 @@ function clashDetect(tetrimino, tetriminoX, tetriminoY, tetriminoRot) {
     return false;
 }
 
+// set the soft drop variable to true
 function startSoftDrop() {
     softDrop = true;
 }
 
+// set the soft drop variable to false
 function endSoftDrop() {
     softDrop = false;
 }
 
+
+// set the hold left variable to true
 function startHoldLeft() {
     holdLeft = true;
 }
 
+// set the hold left variable to false
 function endHoldLeft() {
     holdLeft = false;
 }
 
+// set the hold right variable to true
 function startHoldRight() {
     holdRight = true;
 }
 
+// set the hold right variable to false
 function endHoldRight() {
     holdRight = false;
 }
 
+//runs commands if certian keys are pressed
 function keyPressed() {
     if (keyCode == UP_ARROW || keyCode == 88) rotateClockwise();
     if (keyCode == 17 || keyCode == 90) rotateAnticlockwise();
@@ -658,19 +697,21 @@ function keyPressed() {
     if (keyCode == DOWN_ARROW) startSoftDrop();
     if (keyCode == 32) hardDrop();
     if (state == STATE_GAME_OVER_PLAY_AGAIN) resetGame();
+    
 }
-
+//runs commands if certian keys are released
 function keyReleased() {
     if (keyCode == DOWN_ARROW) endSoftDrop();
     if (keyCode == LEFT_ARROW) endHoldLeft();
     if (keyCode == RIGHT_ARROW) endHoldRight();
 }
 
-
+//rotates the tetromino 90 degres clockwise
 function rotateClockwise() {
     doRotation(TETRIMINO[currentTetrimino].rotation[tetriminoRot].clockwise_centres, 1);
 }
 
+//rotates the tetromino 90 degres counter clockwise
 function rotateAnticlockwise() {
     doRotation(TETRIMINO[currentTetrimino].rotation[tetriminoRot].anticlockwise_centres, 3);
 }
@@ -692,6 +733,7 @@ function doRotation(rot, dir) {
     }
 }
 
+// places the tetromino where its ghost currently is
 function hardDrop() {
     while (!clashDetect(currentTetrimino, tetriminoX, tetriminoY + 1, tetriminoRot)) {
         tetriminoY++;
@@ -702,8 +744,10 @@ function hardDrop() {
     timeToDrop = 0;
     holdLeft = false;
     holdRight = false;
+    sound1.play();
 }
 
+//moves the tetromino 1 square to to left
 function moveLeft() {
     if (!clashDetect(currentTetrimino, tetriminoX - 1, tetriminoY, tetriminoRot)) {
         tetriminoX -= 1;
@@ -715,6 +759,7 @@ function moveLeft() {
     }
 }
 
+//moves the tetromino 1 square to to left
 function moveRight() {
     if (!clashDetect(currentTetrimino, tetriminoX + 1, tetriminoY, tetriminoRot)) {
         tetriminoX += 1;
@@ -726,6 +771,7 @@ function moveRight() {
     }
 }
 
+// if certian derections are being held, move the tetromino that way
 function checkForHold() {
     if (timeToDrop % 2 == 0) {
         return;
@@ -738,7 +784,12 @@ function checkForHold() {
     }
 }
 
-//
+function checkLevel(){
+    if (level > 1){
+    ;
+    }
+}
+
 function checkLockOnMove() {
     if (state == STATE_LOCK_ON) {
         lockOnMovements++;
@@ -754,7 +805,3 @@ function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
     scaleFactor = min(windowHeight / PANEL_HEIGHT, windowWidth / PANEL_WIDTH) * 1.0;
 }
-
-document.ontouchmove = function (event) {
-    event.preventDefault();
-};
