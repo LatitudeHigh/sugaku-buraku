@@ -6,6 +6,7 @@
 // modifed by michael sexton
 
 // how many diffrent frames the game shows per second
+
 const FRAME_RATE = 15;
 
 const PANEL_WIDTH = 200;
@@ -33,10 +34,17 @@ let grid = [];
 // Array containing the math symbols on the tetrominos
 let mathGrid = [];
 
+let sound0;
 let sound1;
 let sound2;
 let sound3;
 let sound4;
+let sound5;
+let sound6;
+let sound7;
+let sound8;
+
+let background1;
 // variables for the state of the current falling tetrimino
 let tetriminoX;
 let tetriminoY;
@@ -53,6 +61,7 @@ let nextSymbols = [];
 let lines = 0;
 let level = 1;
 let score = 0;
+let equation = 0;
 
 // scale factor required to fullscreen the playing area
 let scaleFactor;
@@ -88,20 +97,32 @@ const STATE_GAME_OVER_PLAY_AGAIN = 5;
 
 function preload() {
     myFont = loadFont('fonts/press-start-2p/PressStart2P.ttf');
-    soundFormats('mp3', 'ogg');
-    sound1 = loadSound('sounds/vine-boom/vine-boom.mp3');
-    sound2 = loadSound('sounds/water-phone/water-phone.mp3');
-    sound3 = loadSound('sounds/lego/lego.mp3');
-    sound4 = loadSound('sounds/oh-my-god/oh-my-god.mp3');
+    soundFormats('mp3', 'ogg', 'wav');
+    sound0 = loadSound('sounds/background-music/main-theme.mp3');
+    sound1 = loadSound('sounds/hard-drop/real.wav');
+    sound2 = loadSound('sounds/game-over/real.wav');
+    sound3 = loadSound('sounds/single/real.wav');
+    sound4 = loadSound('sounds/triple/real.wav');
+    sound5 = loadSound('sounds/rotate/real.wav');
+    sound6 = loadSound('sounds/move/real.wav');
+    sound7 = loadSound('sounds/double/real.wav');
+    sound8 = loadSound('sounds/tetris/real.wav');
 }
 
 // sets the game up for play
 function setup() {
+    sound0.play();
+    createCanvas(720, 400);
+    for(var block = 0; block < TETRIMINO.length; block++) {
+      TETRIMINO[block]["image"] = loadImage('assets/blocks/block' + (block + 1) + '.jpg'); 
+        background1 = loadImage('assets/backgrounds/moon1.jpg');
+    }
     frameRate(FRAME_RATE);
     scaleFactor = min(windowHeight / PANEL_HEIGHT, windowWidth / PANEL_WIDTH) * 1.0;
     textFont(myFont);
     let canvas = createCanvas(windowWidth, windowHeight);
     resetGame();
+    
 }
 
 // restarts the game for a new round
@@ -203,42 +224,43 @@ function stateLock() {
             if (linesComplete.length > 0) {
                 // increase player's score
                 lines += linesComplete.length;
-
+                            updateEquation();
                 switch (linesComplete.length) {
                     case 1:
                         if (tSpin) {
                             message = 'T-SPIN\NSINGLE!';
-                            score += 800 * level;
+                            score += equation * 4 * level;
                         } else {
                             message = '';
-                            score += 100 * level;
+                            score += equation * 1  * level;
+                            sound3.play();
                         }
                         break;
                     case 2:
                         if (tSpin) {
                             message = 'T-SPIN\NDOUBLE!';
-                            score += 1200 * level;
+                            score += equation * 5 * level;
                         } else {
                             message = 'DOUBLE!';
-                            score += 300 * level;
+                            score += equation * 2 * level;
+                            sound7.play();
                         }
                         break
                     case 3:
                         if (tSpin) {
                             message = 'T-SPIN\NTRIPLE!';
-                            score += 1600 * level;
+                            score += equation * 6 * level;
                         } else {
                             message = 'TRIPLE!';
-                            score += 500 * level;
+                            score += equation * 3 * level;
+                            sound4.play();
                         }
                         break;
                     case 4:
                         message = 'TETRIS!';
-                        score += 800 * level;
+                        score += equation * 4 * level;
+                        sound8.play();
                         break;
-                        sound4.play();
-                        sound3.stop();
-
                 }
 
                 messageTTL = FRAME_RATE;
@@ -261,10 +283,12 @@ function stateLock() {
                 } else {
                     // if it failed, game over!
                     switchState(STATE_GAME_OVER_ANIMATION);
+                    sound8.play();
                 }
             }
         } else {
             // if tetrimino locked on entirely above the skyline - game over!
+            sound2.play();
             switchState(STATE_GAME_OVER_ANIMATION);
         }
     } else if (!clashDetect(currentTetrimino, tetriminoX, tetriminoY + 1, tetriminoRot)) {
@@ -273,6 +297,23 @@ function stateLock() {
         timeToDrop = dropTime();
         switchState(STATE_FALLING);
     }
+}
+
+function  updateEquation() {
+    linesComplete.forEach(function (y) {
+        var lineText = "";
+        for(var x = 0; x < mathGrid.length; x++) {
+            lineText += mathGrid[x][y];
+        }
+        //
+        try {
+            equation = eval(lineText);
+        } catch (err) {
+            messageTTL = FRAME_RATE;
+            message = 'DUD :(';
+            equation = 0;
+        }
+    });
 }
 
 // removes lines players clear, and moves the above line down one
@@ -294,7 +335,6 @@ function clearLines() {
             timeToDrop += ANIMATION_SPEED;
         }
     }
-    sound3.play();
 }
 
 // runs when a player trys to place a tetromino fully abobe the skyline
@@ -317,7 +357,6 @@ function gameOver() {
         }
         timeToDrop += FRAME_RATE / 20;
         animationFrame++;
-        sound2.play();
     }
 }
 
@@ -341,8 +380,7 @@ function drawGrid() {
         for (y = 0; y < VISIBLE_GRID_HEIGHT; y++) {
             t = grid[x][y + INVISIBLE_GRID_HEIGHT];
             if (t != -1) {
-                fill(color(TETRIMINO[t].color[0], TETRIMINO[t].color[1], TETRIMINO[t].color[2]));
-                rect(x * CELLSIZE + BOARD_X, y * CELLSIZE + BOARD_Y, CELLSIZE - 1, CELLSIZE - 1);
+                image(TETRIMINO[t].image, x * CELLSIZE + BOARD_X, y * CELLSIZE + BOARD_Y, CELLSIZE - 1, CELLSIZE - 1);
                 fill(0, 0, 0);
                 textSize(8);
                 textAlign(LEFT, BOTTOM);
@@ -376,13 +414,17 @@ function drawNextTetromino() {
             nextTetriminoRot = 1;
         }
 
-        fill(color(TETRIMINO[nextTetrimino].color[0], TETRIMINO[nextTetrimino].color[1], TETRIMINO[nextTetrimino].color[2]));
-
         let i = 0;
         for (y = 0; y < nextTetriminoSize; y++) {
             for (x = 0; x < nextTetriminoSize; x++) {
                 if (TETRIMINO[nextTetrimino].rotation[nextTetriminoRot].shape[i] == 1) {
-                    rect(nextTetriminoXpos + x * CELLSIZE, nextTetriminoYpos + y * CELLSIZE + BOARD_Y, CELLSIZE - 1, CELLSIZE - 1);
+                    image(
+                      TETRIMINO[nextTetrimino].image,
+                      nextTetriminoXpos + x * CELLSIZE,
+                      nextTetriminoYpos + y * CELLSIZE + BOARD_Y,
+                      CELLSIZE - 1,
+                      CELLSIZE - 1
+                    );
                 }
                 i++;
             }
@@ -397,7 +439,8 @@ function drawFallingTetromino() {
         ghostOffset++;
     }
     let tetriminoSize = TETRIMINO[currentTetrimino].size;
-    let currentTetriminoColor = color(TETRIMINO[currentTetrimino].color[0], TETRIMINO[currentTetrimino].color[1], TETRIMINO[currentTetrimino].color[2]);
+    let currentTetriminoImage = TETRIMINO[currentTetrimino].image;
+    let currentTetriminoColor = color(TETRIMINO[currentTetrimino].color[0], TETRIMINO[currentTetrimino].color[1], TETRIMINO[currentTetrimino].color[2])
     if (state == STATE_FALLING || state == STATE_LOCK_ON) {
         let i = 0;
         let mathIdx = 0;
@@ -407,13 +450,15 @@ function drawFallingTetromino() {
                     if (tetriminoY + (y) >= VISIBLE_GRID_HEIGHT) { // don't draw any parts above the skyline
                         noStroke();
                         fill(currentTetriminoColor);
-                        rect(
+                        // replace with image
+                        image(
+                            currentTetriminoImage,
                             (tetriminoX + x) * CELLSIZE + BOARD_X,
                             (tetriminoY + (y) - INVISIBLE_GRID_HEIGHT) * CELLSIZE + BOARD_Y,
                             CELLSIZE - 1,
                             CELLSIZE - 1
                         );
-                        fill(0, 0, 0);
+                        fill(0);
                         textSize(8);
                         textAlign(LEFT, BOTTOM);
                         var val = nextSymbols[mathIdx++];
@@ -463,6 +508,7 @@ function drawGameBoard() {
     text(level, GRID_WIDTH * CELLSIZE + 4 + BOARD_X, BOARD_Y + 42);
     text('SCORE', GRID_WIDTH * CELLSIZE + 4 + BOARD_X, BOARD_Y + 56);
     text(score, GRID_WIDTH * CELLSIZE + 4 + BOARD_X, BOARD_Y + 66);
+    image(background1, BOARD_X, BOARD_Y,  GRID_WIDTH * CELLSIZE, VISIBLE_GRID_HEIGHT * CELLSIZE);
 }
 
 //a bunch of checks constintly running
@@ -485,12 +531,12 @@ function draw() {
         case STATE_GAME_OVER_ANIMATION:
             gameOver();
             break;
+            sound2.play();
             // prompt to play again
         case STATE_GAME_OVER_PLAY_AGAIN:
             playAgain();
             break;
     }
-
     drawGameBoard();
 
     // draw "next" tetrimino
@@ -569,7 +615,6 @@ function switchState(newState) {
 // Removes all the rows in the "linesComplete" array and slides all the blocks
 // above down to fill the space.
 function removeClearedLines() {
-    // TODO: Update the score here
     let yOffs = 0;
 
     linesComplete.forEach(function (y) {
@@ -690,6 +735,18 @@ function endHoldRight() {
 
 //runs commands if certian keys are pressed
 function keyPressed() {
+    if (keyCode == 49)
+        background1 = loadImage('assets/backgrounds/moon1.jpg');
+    if (keyCode == 50)
+        background1 = loadImage('assets/backgrounds/moon2.jpg');
+    if (keyCode == 51)
+        background1 = loadImage('assets/backgrounds/moon3.jpg');
+    if (keyCode == 52)
+        background1 = loadImage('assets/backgrounds/moon4.jpg');
+    if (keyCode == 53)
+        background1 = loadImage('assets/backgrounds/moon5.jpg');
+     if (keyCode == 54)
+        background1 = loadImage('assets/backgrounds/moon6.jpg');
     if (keyCode == UP_ARROW || keyCode == 88) rotateClockwise();
     if (keyCode == 17 || keyCode == 90) rotateAnticlockwise();
     if (keyCode == LEFT_ARROW) startHoldLeft();
@@ -709,11 +766,13 @@ function keyReleased() {
 //rotates the tetromino 90 degres clockwise
 function rotateClockwise() {
     doRotation(TETRIMINO[currentTetrimino].rotation[tetriminoRot].clockwise_centres, 1);
+sound5.play();
 }
 
 //rotates the tetromino 90 degres counter clockwise
 function rotateAnticlockwise() {
     doRotation(TETRIMINO[currentTetrimino].rotation[tetriminoRot].anticlockwise_centres, 3);
+sound5.play();
 }
 
 function doRotation(rot, dir) {
@@ -750,6 +809,7 @@ function hardDrop() {
 //moves the tetromino 1 square to to left
 function moveLeft() {
     if (!clashDetect(currentTetrimino, tetriminoX - 1, tetriminoY, tetriminoRot)) {
+        sound6.play();
         tetriminoX -= 1;
         lastMoveRotation = false;
         if (tetriminoY > lowestTetriminoY) {
@@ -762,6 +822,7 @@ function moveLeft() {
 //moves the tetromino 1 square to to left
 function moveRight() {
     if (!clashDetect(currentTetrimino, tetriminoX + 1, tetriminoY, tetriminoRot)) {
+        sound6.play();
         tetriminoX += 1;
         lastMoveRotation = false;
         if (tetriminoY > lowestTetriminoY) {
